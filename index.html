@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Bolton College Digital Air Ace</title>
+<style>
+  :root{
+    --ink:#ecf7ff;
+    --panel:#10233a;
+    --panel2:#17395b;
+    --accent:#ffcf3f;
+    --good:#6ee7a8;
+    --bad:#ff6f73;
+    --blue:#69c8ff;
+  }
+  *{box-sizing:border-box}
+  html,body{
+    width:100%;height:100%;margin:0;overflow:hidden;
+    font-family:Arial, Helvetica, sans-serif;
+    background:#06101f;color:var(--ink);
+    touch-action:manipulation;
+  }
+  body{
+    display:flex;align-items:center;justify-content:center;
+  }
+  #gameShell{
+    position:relative;
+    width:min(100vw, 177.78vh);
+    height:min(100vh, 56.25vw);
+    min-width:320px;min-height:180px;
+    overflow:hidden;
+    border:4px solid #284c70;
+    background:#08182b;
+    box-shadow:0 0 40px rgba(0,0,0,.55);
+  }
+  canvas{position:absolute;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated}
+  #scanlines{
+    position:absolute;inset:0;pointer-events:none;opacity:.16;
+    background:repeating-linear-gradient(
+      to bottom,
+      rgba(255,255,255,.08) 0,
+      rgba(255,255,255,.08) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+    mix-blend-mode:screen;
+  }
+  #hud{
+    position:absolute;left:0;right:0;top:0;z-index:4;
+    display:flex;gap:12px;align-items:center;justify-content:space-between;
+    padding:12px 16px;
+    background:linear-gradient(to bottom,rgba(3,10,20,.88),rgba(3,10,20,.2),transparent);
+    font-weight:800;letter-spacing:.04em;text-shadow:0 2px 0 #000;
+  }
+  .hudBlock{display:flex;align-items:center;gap:10px}
+  .badge{
+    display:inline-flex;align-items:center;justify-content:center;
+    min-width:74px;padding:7px 10px;border:2px solid #4778a4;
+    border-radius:8px;background:rgba(9,28,50,.88);
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.05);
+  }
+  #lives{color:#ff8c8f;letter-spacing:.15em}
+  #progressWrap{
+    width:220px;height:16px;border:2px solid #4778a4;border-radius:8px;overflow:hidden;
+    background:#071325;
+  }
+  #progressBar{height:100%;width:0%;background:linear-gradient(90deg,#56d5ff,#80f7b4);transition:width .35s ease}
+  #questionPanel{
+    position:absolute;z-index:5;left:50%;bottom:4.5%;transform:translateX(-50%);
+    width:min(92%,1100px);
+    padding:18px 20px 20px;
+    background:linear-gradient(180deg,rgba(15,39,64,.97),rgba(7,22,40,.97));
+    border:3px solid #4f82b3;border-radius:16px;
+    box-shadow:0 12px 34px rgba(0,0,0,.55), inset 0 0 0 2px rgba(255,255,255,.05);
+    transition:transform .2s ease, opacity .2s ease;
+  }
+  #questionPanel.hidden{opacity:0;pointer-events:none;transform:translate(-50%,30px)}
+  #category{
+    color:var(--accent);font-size:clamp(13px,1.3vw,19px);font-weight:900;
+    letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;
+  }
+  #question{
+    font-size:clamp(20px,2.05vw,32px);font-weight:900;line-height:1.15;margin-bottom:15px;
+  }
+  #answers{
+    display:grid;grid-template-columns:1fr 1fr;gap:12px;
+  }
+  .answer{
+    min-height:64px;padding:10px 14px;
+    border:3px solid #497bac;border-radius:12px;
+    background:linear-gradient(#234c73,#173654);
+    color:#fff;font-size:clamp(16px,1.6vw,24px);font-weight:800;
+    text-align:left;cursor:pointer;
+    box-shadow:0 5px 0 #081a2c;
+    transition:transform .08s ease,filter .12s ease,background .12s ease;
+  }
+  .answer:hover,.answer:focus{filter:brightness(1.18);outline:3px solid rgba(255,207,63,.45)}
+  .answer:active{transform:translateY(4px);box-shadow:0 1px 0 #081a2c}
+  .answer.correct{background:linear-gradient(#31a86f,#1d7751);border-color:#8ff4c0}
+  .answer.wrong{background:linear-gradient(#b7464f,#7f252c);border-color:#ff9a9d}
+  .key{
+    display:inline-flex;width:34px;height:34px;margin-right:9px;border:2px solid rgba(255,255,255,.5);
+    border-radius:7px;align-items:center;justify-content:center;background:rgba(0,0,0,.25);
+  }
+  #message{
+    position:absolute;z-index:6;left:50%;top:31%;transform:translate(-50%,-50%) scale(.8);
+    min-width:260px;text-align:center;opacity:0;pointer-events:none;
+    font-size:clamp(28px,4.2vw,72px);font-weight:1000;letter-spacing:.03em;
+    text-shadow:0 5px 0 #000,0 0 18px rgba(255,255,255,.35);
+  }
+  #message.show{animation:messagePop 1.05s ease both}
+  @keyframes messagePop{
+    0%{opacity:0;transform:translate(-50%,-50%) scale(.55)}
+    16%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}
+    72%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+    100%{opacity:0;transform:translate(-50%,-70%) scale(.95)}
+  }
+  #overlay{
+    position:absolute;z-index:10;inset:0;
+    display:flex;align-items:center;justify-content:center;padding:24px;
+    background:
+      radial-gradient(circle at 50% 18%,rgba(52,115,170,.28),transparent 42%),
+      linear-gradient(rgba(2,8,16,.42),rgba(2,8,16,.86));
+  }
+  #overlay.hidden{display:none}
+  .card{
+    width:min(820px,94%);max-height:94%;overflow:auto;text-align:center;
+    border:4px solid #4a7ba7;border-radius:20px;
+    background:linear-gradient(180deg,#153a5d,#0b2138);
+    box-shadow:0 18px 60px rgba(0,0,0,.65),inset 0 0 0 3px rgba(255,255,255,.04);
+    padding:28px;
+  }
+  .title{
+    margin:0;color:#fff;font-size:clamp(36px,6vw,80px);line-height:.92;
+    font-weight:1000;letter-spacing:.03em;text-shadow:0 5px 0 #07111d;
+  }
+  .subTitle{
+    margin:10px 0 18px;color:var(--accent);font-weight:900;
+    font-size:clamp(15px,2vw,24px);letter-spacing:.16em;text-transform:uppercase;
+  }
+  .lead{
+    margin:0 auto 18px;max-width:690px;font-size:clamp(16px,1.7vw,23px);line-height:1.35;
+  }
+  .rules{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0;
+  }
+  .rule{
+    padding:14px;border:2px solid #3d6c97;border-radius:12px;background:rgba(4,16,30,.4);
+    font-weight:800;font-size:clamp(14px,1.35vw,20px);
+  }
+  .bigBtn,.smallBtn{
+    border:0;border-radius:13px;cursor:pointer;font-weight:1000;text-transform:uppercase;
+    letter-spacing:.06em;color:#082033;background:linear-gradient(#ffe36f,#f4b728);
+    box-shadow:0 7px 0 #9e6a0f;
+  }
+  .bigBtn{font-size:clamp(22px,2.6vw,36px);padding:16px 34px;min-width:280px}
+  .bigBtn:active,.smallBtn:active{transform:translateY(5px);box-shadow:0 2px 0 #9e6a0f}
+  .smallBtn{font-size:16px;padding:10px 14px;min-width:auto}
+  .secondary{
+    color:#fff;background:linear-gradient(#3a6c95,#244966);box-shadow:0 6px 0 #10283b;
+  }
+  #topButtons{
+    position:absolute;z-index:7;right:14px;top:62px;display:flex;gap:8px;
+  }
+  #footerNote{
+    margin-top:16px;color:#a9cbe6;font-size:13px;
+  }
+  #nameEntry{
+    display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin:16px 0;
+  }
+  #playerName{
+    width:270px;padding:13px 15px;border-radius:10px;border:3px solid #4b7da9;
+    background:#071629;color:#fff;font-size:20px;font-weight:800;text-transform:uppercase;
+  }
+  #scoreList{
+    list-style:none;padding:0;margin:15px auto 20px;max-width:520px;text-align:left;
+  }
+  #scoreList li{
+    display:grid;grid-template-columns:42px minmax(90px,1fr) 84px 86px 88px;gap:8px;padding:8px 10px;
+    border-bottom:1px solid rgba(255,255,255,.12);font-size:clamp(13px,1.35vw,18px);font-weight:800;
+    align-items:center;
+  }
+  #scoreList .scoreHead{color:#9ec9e8;font-size:clamp(11px,1.05vw,14px);text-transform:uppercase;letter-spacing:.06em}
+  #scoreList span:nth-child(n+3){text-align:right}
+  .resultStats{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:18px 0;
+  }
+  .stat{
+    background:rgba(0,0,0,.22);border:2px solid #3e6c95;border-radius:12px;padding:14px;
+  }
+  .stat strong{display:block;color:var(--accent);font-size:32px}
+  @media (max-width:760px){
+    #answers{grid-template-columns:1fr}
+    #questionPanel{bottom:2%;padding:12px}
+    .answer{min-height:48px}
+    .rules{grid-template-columns:1fr}
+    .resultStats{grid-template-columns:repeat(2,1fr)}
+    #progressWrap{width:90px}
+    .badge{min-width:56px;padding:5px 8px}
+    #hud{padding:7px 8px;font-size:12px}
+    #topButtons{top:47px}
+  }
+</style>
+</head>
+<body>
+<div id="gameShell">
+  <canvas id="game" width="1600" height="900" aria-label="Retro aircraft quiz game"></canvas>
+  <div id="scanlines"></div>
+
+  <div id="hud">
+    <div class="hudBlock">
+      <div class="badge">SCORE&nbsp;<span id="score">0</span></div>
+      <div class="badge">TIME&nbsp;<span id="timer">0.0s</span></div>
+      <div class="badge">LIVES&nbsp;<span id="lives">♥♥♥</span></div>
+    </div>
+    <div class="hudBlock">
+      <div id="progressWrap" aria-label="Mission progress"><div id="progressBar"></div></div>
+      <div class="badge"><span id="roundText">0 / 8</span></div>
+    </div>
+  </div>
+
+  <div id="topButtons">
+    <button id="soundBtn" class="smallBtn secondary" type="button">Sound: On</button>
+    <button id="fullBtn" class="smallBtn secondary" type="button">Full Screen</button>
+  </div>
+
+  <div id="message"></div>
+
+  <section id="questionPanel" class="hidden" aria-live="polite">
+    <div id="category">AI CHALLENGE</div>
+    <div id="question">Question appears here</div>
+    <div id="answers"></div>
+  </section>
+
+  <div id="overlay">
+    <div class="card" id="startCard">
+      <h1 class="title">DIGITAL<br>AIR ACE</h1>
+      <div class="subTitle">Bolton College Digital Systems &amp; AI Challenge</div>
+      <p class="lead">Answer fast. A correct answer launches your attack and destroys the enemy aircraft. A wrong answer costs one life.</p>
+
+      <div class="rules">
+        <div class="rule">🎯 8 rapid questions</div>
+        <div class="rule">❤️ 3 lives</div>
+        <div class="rule">⏱️ Faster answers earn bonus points</div>
+      </div>
+
+      <div id="nameEntry">
+        <input id="playerName" maxlength="12" placeholder="CALL SIGN" aria-label="Enter your call sign" />
+      </div>
+
+      <button id="startBtn" class="bigBtn" type="button">Start Mission</button>
+      <div id="footerNote">Touchscreen ready • Also use keys 1–4 • No login required</div>
+    </div>
+
+    <div class="card" id="endCard" style="display:none">
+      <h2 class="title" id="endTitle">MISSION COMPLETE</h2>
+      <div class="subTitle" id="endSubtitle">Digital systems secured</div>
+      <div class="resultStats">
+        <div class="stat"><strong id="finalScore">0</strong>Total Score</div>
+        <div class="stat"><strong id="finalCorrect">0/8</strong>Correct</div>
+        <div class="stat"><strong id="finalTime">0.0s</strong>Response Time</div>
+        <div class="stat"><strong id="finalBonus">+0</strong>Speed Bonus</div>
+      </div>
+      <h3>Top Air Aces</h3>
+      <ol id="scoreList"></ol>
+      <button id="restartBtn" class="bigBtn" type="button">Play Again</button>
+      <button id="resetScoresBtn" class="smallBtn secondary" type="button" style="margin-left:10px">Reset Scores</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  /*
+    QUICK EDITING:
+    Change or add questions in QUESTION_BANK below.
+    correct: 0 means first answer, 1 means second, etc.
+    The game randomly selects 8 questions per play.
+  */
+  const QUESTION_BANK = [
+    {
+      category:"Digital System",
+      question:"Where are you most likely to find your course resources and activities?",
+      answers:["Moodle","Calculator","Camera","Maps"],
+      correct:0
+    },
+    {
+      category:"College App",
+      question:"Which app would you normally use for your college email?",
+      answers:["OneDrive","Outlook","Paint","Photos"],
+      correct:1
+    },
+    {
+      category:"Digital System",
+      question:"Which service should you use to save college files so they are backed up online?",
+      answers:["Downloads folder","Recycle Bin","OneDrive","A USB you found"],
+      correct:2
+    },
+    {
+      category:"Spot the Scam",
+      question:"You receive an MFA approval request, but you are not trying to sign in. What should you do?",
+      answers:["Approve it quickly","Ignore or reject it and report it","Send the code to a friend","Keep approving until it stops"],
+      correct:1
+    },
+    {
+      category:"AI Challenge",
+      question:"Can an AI tool sometimes produce information that sounds convincing but is wrong?",
+      answers:["Yes","No","Only at weekends","Only for maths"],
+      correct:0
+    },
+    {
+      category:"AI Expectations",
+      question:"You are unsure whether AI is allowed in an assessment. What is the best next step?",
+      answers:["Use it secretly","Ask your tutor","Copy a friend's answer","Submit first and ask later"],
+      correct:1
+    },
+    {
+      category:"AI Expectations",
+      question:"Which is the safest use of AI for learning?",
+      answers:["Writing your whole assignment","Creating revision questions","Inventing references","Uploading confidential placement records"],
+      correct:1
+    },
+    {
+      category:"Spot the Scam",
+      question:"A message asks for your password and verification code. What should you do?",
+      answers:["Send both","Only send the password","Do not share them","Post them in the class chat"],
+      correct:2
+    },
+    {
+      category:"College App",
+      question:"Which Microsoft app is commonly used for online class messages and meetings?",
+      answers:["Teams","Excel","Clipchamp","Weather"],
+      correct:0
+    },
+    {
+      category:"AI Challenge",
+      question:"Who is responsible for checking the accuracy of work you submit?",
+      answers:["The AI tool","You","Nobody","Another student"],
+      correct:1
+    },
+    {
+      category:"AI Expectations",
+      question:"Which information should you avoid entering into a public AI tool?",
+      answers:["A made-up quiz topic","Personal or confidential information","A general revision question","A fictional scenario"],
+      correct:1
+    },
+    {
+      category:"Digital System",
+      question:"What is the safest action if you cannot access your college account?",
+      answers:["Use someone else's login","Contact the official support service","Create a fake account","Share your password online"],
+      correct:1
+    },
+    {
+      category:"AI Challenge",
+      question:"Which prompt is more useful?",
+      answers:[
+        "Tell me stuff",
+        "Explain three safeguarding responsibilities for a Level 2 learner using simple examples",
+        "Do all my work",
+        "Give answer"
+      ],
+      correct:1
+    },
+    {
+      category:"Spot the Scam",
+      question:"Which is the clearest warning sign in an email?",
+      answers:["It uses your name","It demands urgent action through a suspicious link","It comes from your tutor's official address","It contains a normal signature"],
+      correct:1
+    },
+    {
+      category:"AI Expectations",
+      question:"Is it acceptable to submit a fully AI-generated assignment as your own work?",
+      answers:["Yes, always","Only if it is long","No","Only if nobody notices"],
+      correct:2
+    },
+    {
+      category:"College App",
+      question:"Where should you normally look for official messages from the college?",
+      answers:["Your college email and official systems","Random social media comments","A gaming chat","An unknown website"],
+      correct:0
+    },
+    {
+      category:"Digital Safety",
+      question:"Which password is strongest?",
+      answers:["password123","boltoncollege","Blue!River47Train","12345678"],
+      correct:2
+    },
+    {
+      category:"Digital Safety",
+      question:"Should you share your college password with a friend?",
+      answers:["Yes, if they ask nicely","Only once","No","Only during induction"],
+      correct:2
+    },
+    {
+      category:"AI Challenge",
+      question:"What should you do with references suggested by AI?",
+      answers:["Trust them automatically","Check that they are real and accurate","Delete all references","Change the author name"],
+      correct:1
+    },
+    {
+      category:"AI Expectations",
+      question:"Which is a reasonable way to use AI after writing your own draft?",
+      answers:["Ask for feedback on clarity","Replace your work without reading it","Invent evidence","Hide your use from your tutor"],
+      correct:0
+    }
+  ];
+
+  const TOTAL_ROUNDS = 8;
+  const START_LIVES = 3;
+  const POINTS_PER_CORRECT = 1000;
+  const MAX_SPEED_BONUS = 999;
+  const SPEED_PENALTY_PER_SECOND = 20;
+  const SCORE_STORAGE_KEY = "digitalAirAceScoresV2";
+
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const shell = document.getElementById("gameShell");
+  const overlay = document.getElementById("overlay");
+  const startCard = document.getElementById("startCard");
+  const endCard = document.getElementById("endCard");
+  const questionPanel = document.getElementById("questionPanel");
+  const questionEl = document.getElementById("question");
+  const categoryEl = document.getElementById("category");
+  const answersEl = document.getElementById("answers");
+  const scoreEl = document.getElementById("score");
+  const timerEl = document.getElementById("timer");
+  const livesEl = document.getElementById("lives");
+  const roundText = document.getElementById("roundText");
+  const progressBar = document.getElementById("progressBar");
+  const messageEl = document.getElementById("message");
+  const playerNameEl = document.getElementById("playerName");
+  const startBtn = document.getElementById("startBtn");
+  const restartBtn = document.getElementById("restartBtn");
+  const resetScoresBtn = document.getElementById("resetScoresBtn");
+  const soundBtn = document.getElementById("soundBtn");
+  const fullBtn = document.getElementById("fullBtn");
+
+  let playing = false;
+  let inputLocked = false;
+  let soundOn = true;
+  let score = 0;
+  let lives = START_LIVES;
+  let round = 0;
+  let correctCount = 0;
+  let enemyKills = 0;
+  let totalResponseMs = 0;
+  let questionStartedAt = 0;
+  let timerRunning = false;
+  let speedBonus = 0;
+  let questions = [];
+  let currentQuestion = null;
+  let lastTime = 0;
+  let playerCallSign = "ACE";
+
+  const state = {
+    clouds: [],
+    stars: [],
+    bullets: [],
+    bombs: [],
+    particles: [],
+    flashes: [],
+    enemy: {x:800,y:230,vx:110,alive:true,respawn:0,tilt:0},
+    player: {x:800,y:650,tilt:0},
+    shake:0,
+    skyOffset:0
+  };
+
+  function resetScene(){
+    state.clouds = Array.from({length:12},(_,i)=>({
+      x:Math.random()*canvas.width,
+      y:70+Math.random()*430,
+      s:35+Math.random()*65,
+      v:8+Math.random()*15,
+      a:.08+Math.random()*.13
+    }));
+    state.stars = Array.from({length:55},()=>({
+      x:Math.random()*canvas.width,
+      y:Math.random()*420,
+      r:Math.random()*1.7+.4,
+      a:Math.random()*.6+.2
+    }));
+    state.bullets=[];
+    state.bombs=[];
+    state.particles=[];
+    state.flashes=[];
+    state.enemy={x:800,y:215,vx:125,alive:true,respawn:0,tilt:0};
+    state.player={x:800,y:660,tilt:0};
+    state.shake=0;
+  }
+
+  function shuffle(arr){
+    const a = [...arr];
+    for(let i=a.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [a[i],a[j]]=[a[j],a[i]];
+    }
+    return a;
+  }
+
+  function startGame(){
+    const typed = playerNameEl.value.trim().toUpperCase().replace(/[^A-Z0-9 -]/g,"").slice(0,12);
+    playerCallSign = typed || "ACE";
+    score=0;lives=START_LIVES;round=0;correctCount=0;enemyKills=0;
+    totalResponseMs=0;questionStartedAt=0;timerRunning=false;speedBonus=0;
+    questions=shuffle(QUESTION_BANK).slice(0,TOTAL_ROUNDS);
+    playing=true;inputLocked=false;
+    resetScene();
+    overlay.classList.add("hidden");
+    startCard.style.display="block";
+    endCard.style.display="none";
+    updateHud();
+    showMessage("MISSION START", "#ffcf3f");
+    setTimeout(nextQuestion,650);
+    ensureAudio();
+  }
+
+  function nextQuestion(){
+    if(!playing) return;
+    if(round>=TOTAL_ROUNDS || lives<=0){
+      finishGame();
+      return;
+    }
+    currentQuestion=questions[round];
+    categoryEl.textContent=currentQuestion.category;
+    questionEl.textContent=currentQuestion.question;
+    answersEl.innerHTML="";
+    currentQuestion.answers.forEach((answer,i)=>{
+      const btn=document.createElement("button");
+      btn.className="answer";
+      btn.type="button";
+      btn.innerHTML=`<span class="key">${i+1}</span>${escapeHtml(answer)}`;
+      btn.addEventListener("click",()=>answerQuestion(i,btn));
+      answersEl.appendChild(btn);
+    });
+    questionPanel.classList.remove("hidden");
+    inputLocked=false;
+    questionStartedAt=performance.now();
+    timerRunning=true;
+    updateHud();
+  }
+
+  function answerQuestion(index,button){
+    if(!playing || inputLocked) return;
+    inputLocked=true;
+    if(timerRunning){
+      totalResponseMs += Math.max(0, performance.now()-questionStartedAt);
+      timerRunning=false;
+    }
+    const buttons=[...document.querySelectorAll(".answer")];
+    const isCorrect=index===currentQuestion.correct;
+
+    buttons[currentQuestion.correct].classList.add("correct");
+    if(!isCorrect) button.classList.add("wrong");
+
+    if(isCorrect){
+      correctCount++;
+      score = correctCount * POINTS_PER_CORRECT;
+      fireAttack();
+      showMessage("DIRECT HIT!", "#6ee7a8");
+      playTone(520,.08,"square",.12);
+      setTimeout(()=>playTone(760,.12,"square",.1),100);
+    }else{
+      lives--;
+      enemyAttack();
+      showMessage(lives>0 ? "LIFE LOST!" : "GAME OVER", "#ff6f73");
+      playTone(150,.22,"sawtooth",.14);
+    }
+    round++;
+    updateHud();
+
+    setTimeout(()=>{
+      questionPanel.classList.add("hidden");
+      setTimeout(()=>{
+        if(round>=TOTAL_ROUNDS || lives<=0) finishGame();
+        else {
+          if(!state.enemy.alive) respawnEnemy();
+          nextQuestion();
+        }
+      },300);
+    },1050);
+  }
+
+  function fireAttack(){
+    state.bullets.push({
+      x:state.player.x,y:state.player.y-35,
+      tx:state.enemy.x,ty:state.enemy.y,
+      t:0,d:0.48
+    });
+  }
+
+  function enemyAttack(){
+    state.bombs.push({
+      x:state.enemy.x,y:state.enemy.y+20,
+      tx:state.player.x,ty:state.player.y,
+      t:0,d:0.58
+    });
+  }
+
+  function explode(x,y,good=true){
+    for(let i=0;i<36;i++){
+      const ang=Math.random()*Math.PI*2;
+      const sp=80+Math.random()*250;
+      state.particles.push({
+        x,y,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,
+        life:.55+Math.random()*.7,max:1.2,
+        size:3+Math.random()*11,
+        good
+      });
+    }
+    state.flashes.push({x,y,life:.28,max:.28});
+    state.shake=good?12:18;
+    playExplosion();
+  }
+
+  function respawnEnemy(){
+    state.enemy.alive=true;
+    state.enemy.x=300+Math.random()*1000;
+    state.enemy.y=180+Math.random()*85;
+    state.enemy.vx=(Math.random()>.5?1:-1)*(105+Math.random()*65);
+  }
+
+  function getCurrentResponseMs(){
+    return totalResponseMs + (timerRunning ? Math.max(0,performance.now()-questionStartedAt) : 0);
+  }
+
+  function formatTime(ms){
+    return `${(Math.max(0,ms)/1000).toFixed(1)}s`;
+  }
+
+  function calculateSpeedBonus(){
+    if(round < TOTAL_ROUNDS) return 0;
+    const seconds=totalResponseMs/1000;
+    return Math.max(0,MAX_SPEED_BONUS-Math.round(seconds*SPEED_PENALTY_PER_SECOND));
+  }
+
+  function updateHud(){
+    scoreEl.textContent=score;
+    timerEl.textContent=formatTime(getCurrentResponseMs());
+    livesEl.textContent="♥".repeat(Math.max(0,lives))+"♡".repeat(Math.max(0,START_LIVES-lives));
+    roundText.textContent=`${Math.min(round,TOTAL_ROUNDS)} / ${TOTAL_ROUNDS}`;
+    progressBar.style.width=`${(Math.min(round,TOTAL_ROUNDS)/TOTAL_ROUNDS)*100}%`;
+  }
+
+  function finishGame(){
+    if(timerRunning){
+      totalResponseMs += Math.max(0,performance.now()-questionStartedAt);
+      timerRunning=false;
+    }
+    playing=false;
+    inputLocked=true;
+    questionPanel.classList.add("hidden");
+    speedBonus=calculateSpeedBonus();
+    const livesBonus=round>=TOTAL_ROUNDS ? Math.max(0,lives)*100 : 0;
+    score=(correctCount*POINTS_PER_CORRECT)+speedBonus+livesBonus;
+    updateHud();
+    saveScore();
+    renderScores();
+    document.getElementById("finalScore").textContent=score;
+    document.getElementById("finalCorrect").textContent=`${correctCount}/${TOTAL_ROUNDS}`;
+    document.getElementById("finalTime").textContent=formatTime(totalResponseMs);
+    document.getElementById("finalBonus").textContent=`+${speedBonus}`;
+    document.getElementById("endTitle").textContent=lives>0?"MISSION COMPLETE":"MISSION OVER";
+    document.getElementById("endSubtitle").textContent=lives>0
+      ? `${correctCount}/${TOTAL_ROUNDS} correct in ${formatTime(totalResponseMs)}`
+      : `Mission ended after ${round} questions`;
+    startCard.style.display="none";
+    endCard.style.display="block";
+    overlay.classList.remove("hidden");
+  }
+
+  function rankScores(scores){
+    return scores.sort((a,b)=>
+      (b.correct-a.correct) ||
+      (a.timeMs-b.timeMs) ||
+      (b.lives-a.lives) ||
+      (b.score-a.score) ||
+      (a.date-b.date)
+    );
+  }
+
+  function saveScore(){
+    try{
+      const scores=JSON.parse(localStorage.getItem(SCORE_STORAGE_KEY)||"[]");
+      scores.push({
+        name:playerCallSign,
+        score,
+        correct:correctCount,
+        answered:round,
+        timeMs:Math.round(totalResponseMs),
+        lives:Math.max(0,lives),
+        bonus:speedBonus,
+        date:Date.now()
+      });
+      rankScores(scores);
+      localStorage.setItem(SCORE_STORAGE_KEY,JSON.stringify(scores.slice(0,20)));
+    }catch(e){}
+  }
+
+  function renderScores(){
+    let scores=[];
+    try{scores=JSON.parse(localStorage.getItem(SCORE_STORAGE_KEY)||"[]");}catch(e){}
+    rankScores(scores);
+    const list=document.getElementById("scoreList");
+    list.innerHTML='<li class="scoreHead"><span>#</span><span>Call sign</span><span>Correct</span><span>Time</span><span>Score</span></li>';
+    if(!scores.length){
+      list.innerHTML += '<li><span>1</span><span>ACE</span><span>0/8</span><span>—</span><span>0</span></li>';
+      return;
+    }
+    scores.slice(0,8).forEach((s,i)=>{
+      const li=document.createElement("li");
+      li.innerHTML=`<span>${i+1}</span><span>${escapeHtml(s.name)}</span><span>${s.correct}/${TOTAL_ROUNDS}</span><span>${formatTime(s.timeMs)}</span><span>${s.score}</span>`;
+      list.appendChild(li);
+    });
+  }
+
+  function escapeHtml(value){
+    return String(value).replace(/[&<>"']/g,ch=>({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+    }[ch]));
+  }
+
+  function showMessage(text,color){
+    messageEl.textContent=text;
+    messageEl.style.color=color;
+    messageEl.classList.remove("show");
+    void messageEl.offsetWidth;
+    messageEl.classList.add("show");
+  }
+
+  function drawBackground(){
+    const g=ctx.createLinearGradient(0,0,0,canvas.height);
+    g.addColorStop(0,"#071426");
+    g.addColorStop(.52,"#173b5a");
+    g.addColorStop(1,"#7d5c4b");
+    ctx.fillStyle=g;
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // moon glow
+    const rg=ctx.createRadialGradient(1280,120,10,1280,120,230);
+    rg.addColorStop(0,"rgba(255,232,170,.18)");
+    rg.addColorStop(1,"rgba(255,232,170,0)");
+    ctx.fillStyle=rg;
+    ctx.fillRect(1000,0,520,380);
+
+    ctx.fillStyle="rgba(255,240,198,.73)";
+    ctx.beginPath();ctx.arc(1280,120,42,0,Math.PI*2);ctx.fill();
+
+    // stars
+    for(const s of state.stars){
+      ctx.globalAlpha=s.a;
+      ctx.fillStyle="#e9f7ff";
+      ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();
+    }
+    ctx.globalAlpha=1;
+
+    // distant hills
+    ctx.fillStyle="#112537";
+    ctx.beginPath();
+    ctx.moveTo(0,610);
+    for(let x=0;x<=1600;x+=90){
+      const y=560+Math.sin(x*.013)*34+Math.sin(x*.031)*18;
+      ctx.lineTo(x,y);
+    }
+    ctx.lineTo(1600,900);ctx.lineTo(0,900);ctx.closePath();ctx.fill();
+
+    // runway / fields
+    ctx.fillStyle="#171e24";ctx.fillRect(0,650,1600,250);
+    ctx.fillStyle="#30352f";
+    for(let i=0;i<12;i++){
+      ctx.fillRect(i*150,650+(i%2)*44,110,36);
+    }
+    ctx.fillStyle="rgba(225,205,130,.34)";
+    ctx.beginPath();ctx.moveTo(700,900);ctx.lineTo(785,650);ctx.lineTo(815,650);ctx.lineTo(900,900);ctx.closePath();ctx.fill();
+    for(let y=690;y<900;y+=58){
+      const w=12+(y-690)*.08;
+      ctx.fillStyle="rgba(255,238,170,.52)";
+      ctx.fillRect(800-w/2,y,w,20);
+    }
+
+    // clouds
+    for(const c of state.clouds){
+      ctx.globalAlpha=c.a;
+      ctx.fillStyle="#dcefff";
+      drawCloud(c.x,c.y,c.s);
+    }
+    ctx.globalAlpha=1;
+  }
+
+  function drawCloud(x,y,s){
+    ctx.beginPath();
+    ctx.arc(x,y,s*.32,0,Math.PI*2);
+    ctx.arc(x+s*.32,y-s*.08,s*.42,0,Math.PI*2);
+    ctx.arc(x+s*.72,y,s*.30,0,Math.PI*2);
+    ctx.arc(x+s*.4,y+s*.12,s*.42,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  function drawPlayer(){
+    const p=state.player;
+    ctx.save();
+    ctx.translate(p.x,p.y);
+    ctx.rotate(p.tilt);
+    ctx.scale(1.15,1.15);
+
+    ctx.fillStyle="#c6d6df";
+    ctx.strokeStyle="#253847";ctx.lineWidth=5;
+
+    // wings
+    ctx.beginPath();
+    ctx.moveTo(-17,-12);ctx.lineTo(-120,26);ctx.lineTo(-104,48);ctx.lineTo(-16,28);
+    ctx.lineTo(16,28);ctx.lineTo(104,48);ctx.lineTo(120,26);ctx.lineTo(17,-12);
+    ctx.closePath();ctx.fill();ctx.stroke();
+
+    // fuselage
+    ctx.beginPath();
+    ctx.moveTo(0,-78);ctx.bezierCurveTo(18,-50,22,14,12,80);
+    ctx.lineTo(0,106);ctx.lineTo(-12,80);ctx.bezierCurveTo(-22,14,-18,-50,0,-78);
+    ctx.closePath();ctx.fill();ctx.stroke();
+
+    // tail
+    ctx.beginPath();
+    ctx.moveTo(-10,61);ctx.lineTo(-52,87);ctx.lineTo(-43,101);ctx.lineTo(-8,87);
+    ctx.lineTo(8,87);ctx.lineTo(43,101);ctx.lineTo(52,87);ctx.lineTo(10,61);
+    ctx.closePath();ctx.fill();ctx.stroke();
+
+    // canopy
+    ctx.fillStyle="#2a739b";
+    ctx.beginPath();ctx.ellipse(0,-18,11,30,0,0,Math.PI*2);ctx.fill();
+
+    // college-friendly roundel, no historic insignia
+    ctx.fillStyle="#5dc2ec";ctx.beginPath();ctx.arc(-63,26,12,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle="#f5d15e";ctx.beginPath();ctx.arc(-63,26,6,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle="#5dc2ec";ctx.beginPath();ctx.arc(63,26,12,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle="#f5d15e";ctx.beginPath();ctx.arc(63,26,6,0,Math.PI*2);ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawEnemy(){
+    const e=state.enemy;
+    if(!e.alive) return;
+    ctx.save();
+    ctx.translate(e.x,e.y);
+    ctx.rotate(Math.PI + e.tilt);
+    ctx.scale(.96,.96);
+    ctx.fillStyle="#c96f5c";
+    ctx.strokeStyle="#43211f";ctx.lineWidth=5;
+
+    ctx.beginPath();
+    ctx.moveTo(-16,-12);ctx.lineTo(-108,24);ctx.lineTo(-90,48);ctx.lineTo(-15,28);
+    ctx.lineTo(15,28);ctx.lineTo(90,48);ctx.lineTo(108,24);ctx.lineTo(16,-12);
+    ctx.closePath();ctx.fill();ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(0,-72);ctx.bezierCurveTo(16,-44,20,14,11,78);
+    ctx.lineTo(0,100);ctx.lineTo(-11,78);ctx.bezierCurveTo(-20,14,-16,-44,0,-72);
+    ctx.closePath();ctx.fill();ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(-9,61);ctx.lineTo(-45,87);ctx.lineTo(-36,101);ctx.lineTo(-7,86);
+    ctx.lineTo(7,86);ctx.lineTo(36,101);ctx.lineTo(45,87);ctx.lineTo(9,61);
+    ctx.closePath();ctx.fill();ctx.stroke();
+
+    ctx.fillStyle="#6b2e2f";
+    ctx.beginPath();ctx.ellipse(0,-18,10,28,0,0,Math.PI*2);ctx.fill();
+
+    // fictional opposing squadron emblem
+    ctx.fillStyle="#321a22";
+    for(const x of [-56,56]){
+      ctx.beginPath();
+      ctx.moveTo(x,19);ctx.lineTo(x+10,30);ctx.lineTo(x,41);ctx.lineTo(x-10,30);
+      ctx.closePath();ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawProjectiles(){
+    for(const b of state.bullets){
+      const x=b.x+(b.tx-b.x)*easeOutCubic(b.t/b.d);
+      const y=b.y+(b.ty-b.y)*easeOutCubic(b.t/b.d);
+      ctx.strokeStyle="rgba(255,235,120,.48)";ctx.lineWidth=7;
+      ctx.beginPath();ctx.moveTo(state.player.x,state.player.y-34);ctx.lineTo(x,y);ctx.stroke();
+      ctx.fillStyle="#fff6a4";ctx.beginPath();ctx.arc(x,y,8,0,Math.PI*2);ctx.fill();
+    }
+    for(const b of state.bombs){
+      const t=Math.min(1,b.t/b.d);
+      const x=b.x+(b.tx-b.x)*t;
+      const y=b.y+(b.ty-b.y)*t + Math.sin(t*Math.PI)*70;
+      ctx.fillStyle="#ff745f";ctx.beginPath();ctx.arc(x,y,10,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle="rgba(255,126,93,.46)";ctx.lineWidth=6;
+      ctx.beginPath();ctx.moveTo(b.x,b.y);ctx.lineTo(x,y);ctx.stroke();
+    }
+  }
+
+  function drawParticles(){
+    for(const p of state.particles){
+      const a=Math.max(0,p.life/p.max);
+      ctx.globalAlpha=a;
+      ctx.fillStyle=p.good?(Math.random()>.5?"#ffcf3f":"#ff6f3f"):(Math.random()>.5?"#ff584f":"#ce2c3b");
+      ctx.fillRect(p.x-p.size/2,p.y-p.size/2,p.size,p.size);
+    }
+    ctx.globalAlpha=1;
+    for(const f of state.flashes){
+      const a=Math.max(0,f.life/f.max);
+      const rg=ctx.createRadialGradient(f.x,f.y,0,f.x,f.y,140*(1-a+.25));
+      rg.addColorStop(0,`rgba(255,250,190,${a})`);
+      rg.addColorStop(1,"rgba(255,90,30,0)");
+      ctx.fillStyle=rg;ctx.fillRect(f.x-170,f.y-170,340,340);
+    }
+  }
+
+  function update(dt){
+    if(timerRunning) timerEl.textContent=formatTime(getCurrentResponseMs());
+    for(const c of state.clouds){
+      c.x-=c.v*dt;
+      if(c.x<-200)c.x=1700+Math.random()*300;
+    }
+
+    if(state.enemy.alive){
+      state.enemy.x+=state.enemy.vx*dt;
+      if(state.enemy.x<190 || state.enemy.x>1410) state.enemy.vx*=-1;
+      state.enemy.tilt=Math.sin(performance.now()*.002)*.08;
+    }
+    state.player.x=800+Math.sin(performance.now()*.0012)*28;
+    state.player.tilt=Math.sin(performance.now()*.0012)*.035;
+
+    for(let i=state.bullets.length-1;i>=0;i--){
+      const b=state.bullets[i]; b.t+=dt;
+      if(b.t>=b.d){
+        state.bullets.splice(i,1);
+        if(state.enemy.alive){
+          explode(state.enemy.x,state.enemy.y,true);
+          state.enemy.alive=false;
+          enemyKills++;
+          updateHud();
+        }
+      }
+    }
+    for(let i=state.bombs.length-1;i>=0;i--){
+      const b=state.bombs[i];b.t+=dt;
+      if(b.t>=b.d){
+        state.bombs.splice(i,1);
+        explode(state.player.x,state.player.y,false);
+      }
+    }
+    for(let i=state.particles.length-1;i>=0;i--){
+      const p=state.particles[i];
+      p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=180*dt;p.vx*=.985;
+      if(p.life<=0)state.particles.splice(i,1);
+    }
+    for(let i=state.flashes.length-1;i>=0;i--){
+      state.flashes[i].life-=dt;
+      if(state.flashes[i].life<=0)state.flashes.splice(i,1);
+    }
+    state.shake*=.88;
+  }
+
+  function render(){
+    ctx.save();
+    if(state.shake>0){
+      ctx.translate((Math.random()-.5)*state.shake,(Math.random()-.5)*state.shake);
+    }
+    drawBackground();
+    drawEnemy();
+    drawPlayer();
+    drawProjectiles();
+    drawParticles();
+    ctx.restore();
+  }
+
+  function loop(t){
+    const dt=Math.min(.035,(t-lastTime)/1000 || 0);
+    lastTime=t;
+    update(dt);
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  function easeOutCubic(t){
+    t=Math.max(0,Math.min(1,t));
+    return 1-Math.pow(1-t,3);
+  }
+
+  // Sound
+  let audioCtx=null;
+  function ensureAudio(){
+    if(!soundOn)return;
+    try{
+      if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+      if(audioCtx.state==="suspended") audioCtx.resume();
+    }catch(e){}
+  }
+  function playTone(freq,duration,type="square",gain=.1){
+    if(!soundOn)return;
+    ensureAudio();
+    if(!audioCtx)return;
+    const o=audioCtx.createOscillator();
+    const g=audioCtx.createGain();
+    o.type=type;o.frequency.value=freq;
+    g.gain.setValueAtTime(gain,audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+duration);
+    o.connect(g);g.connect(audioCtx.destination);
+    o.start();o.stop(audioCtx.currentTime+duration);
+  }
+  function playExplosion(){
+    if(!soundOn)return;
+    ensureAudio();
+    if(!audioCtx)return;
+    const bufferSize=audioCtx.sampleRate*.28;
+    const buffer=audioCtx.createBuffer(1,bufferSize,audioCtx.sampleRate);
+    const data=buffer.getChannelData(0);
+    for(let i=0;i<bufferSize;i++){
+      data[i]=(Math.random()*2-1)*(1-i/bufferSize);
+    }
+    const source=audioCtx.createBufferSource();
+    const gain=audioCtx.createGain();
+    gain.gain.value=.12;
+    source.buffer=buffer;source.connect(gain);gain.connect(audioCtx.destination);source.start();
+  }
+
+  startBtn.addEventListener("click",startGame);
+  restartBtn.addEventListener("click",()=>{
+    startCard.style.display="block";
+    endCard.style.display="none";
+    playerNameEl.focus();
+    overlay.classList.remove("hidden");
+  });
+
+  resetScoresBtn.addEventListener("click",()=>{
+    if(confirm("Clear the Digital Air Ace leaderboard on this device?")){
+      try{localStorage.removeItem(SCORE_STORAGE_KEY);}catch(e){}
+      renderScores();
+    }
+  });
+
+  soundBtn.addEventListener("click",()=>{
+    soundOn=!soundOn;
+    soundBtn.textContent=`Sound: ${soundOn?"On":"Off"}`;
+    if(soundOn) playTone(560,.08);
+  });
+
+  fullBtn.addEventListener("click",async()=>{
+    try{
+      if(!document.fullscreenElement) await shell.requestFullscreen();
+      else await document.exitFullscreen();
+    }catch(e){}
+  });
+
+  document.addEventListener("keydown",(e)=>{
+    if(overlay.classList.contains("hidden")){
+      const n=parseInt(e.key,10);
+      if(n>=1 && n<=4){
+        const btn=document.querySelectorAll(".answer")[n-1];
+        if(btn)btn.click();
+      }
+    }else if(e.key==="Enter" && startCard.style.display!=="none"){
+      startGame();
+    }
+  });
+
+  // Block accidental double-tap zoom on kiosk touchscreens
+  let lastTouchEnd=0;
+  document.addEventListener("touchend",(event)=>{
+    const now=Date.now();
+    if(now-lastTouchEnd<=300) event.preventDefault();
+    lastTouchEnd=now;
+  },{passive:false});
+
+  resetScene();
+  renderScores();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
